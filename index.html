@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>إرسال موقع المنزل</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero-panel">
+        <div>
+          <p class="eyebrow">تحديد موقع العائلة</p>
+          <h1>أرسل موقع المنزل بخصوصية</h1>
+          <p class="subtext">النموذج يرسل نقطة على الخريطة فقط، ولا يطلب الاسم أو رقم الجوال أو البريد الإلكتروني أو أي حساب.</p>
+        </div>
+        <div class="privacy-strip" aria-label="تفاصيل الخصوصية">
+          <span>بدون أسماء</span>
+          <span>بدون أرقام جوال</span>
+          <span>بدون حسابات</span>
+        </div>
+      </section>
+
+      <section class="form-panel" aria-labelledby="location-title">
+        <h2 id="location-title">موقع المنزل</h2>
+        <p class="quiet">حدد المنزل على الخريطة، أو استخدم موقع الجوال، أو الصق رابط Google Maps.</p>
+
+        <label class="span-all">
+          رابط Google Maps
+          <input id="mapsLink" name="mapsLink" inputmode="url" autocomplete="off" placeholder="الصق رابط مشاركة من Google Maps">
+        </label>
+
+        <div class="map-picker span-all">
+          <div id="map" aria-label="خريطة تحديد الموقع"></div>
+          <p class="map-help">اضغط على الخريطة لوضع دبوس المنزل.</p>
+        </div>
+
+        <div class="actions">
+          <button id="useLocation" class="primary-button" type="button">استخدم موقعي الحالي</button>
+        </div>
+
+        <form id="locationForm">
+          <label>
+            خط العرض
+            <input id="lat" name="lat" inputmode="decimal" autocomplete="off" placeholder="24.713552" required readonly>
+          </label>
+          <label>
+            خط الطول
+            <input id="lng" name="lng" inputmode="decimal" autocomplete="off" placeholder="46.675296" required readonly>
+          </label>
+          <label class="span-all">
+            ملاحظة اختيارية
+            <input id="note" name="note" maxlength="120" autocomplete="off" placeholder="مثلا: مدخل الشقة أو رقم البوابة">
+          </label>
+          <button class="submit-button" type="submit">إرسال الموقع</button>
+        </form>
+
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>لوحة المواقع</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell admin-shell">
+      <section class="hero-panel admin-heading">
+        <div>
+          <p class="eyebrow">لوحة التحكم</p>
+          <h1>مواقع المنازل المستلمة</h1>
+          <p class="subtext">تظهر هنا نقاط الخريطة فقط بدون أسماء أو أرقام جوال أو بريد إلكتروني أو حسابات.</p>
+        </div>
+        <button id="showQr" class="qr-link" type="button">رمز QR</button>
+      </section>
+
+      <section class="form-panel">
+        <div class="admin-toolbar">
+          <h2>الطلبات</h2>
+          <button id="refresh" class="secondary-button" type="button">تحديث</button>
+        </div>
+        <div id="locations" class="location-list" aria-live="polite"></div>
+      </section>
+
+      <dialog id="qrDialog" class="qr-dialog">
+        <div class="qr-box">
+          <div class="admin-toolbar">
+            <h2>امسح الرمز للإرسال</h2>
+            <button id="closeQr" class="secondary-button" type="button">إغلاق</button>
+          </div>
+          <div id="qrCode" aria-label="رمز QR"></div>
+          <p id="qrUrl" class="quiet"></p>
+        </div>
+      </dialog>
+    </main>
+
+    <script src="/qrcode.min.js"></script>
+    <script src="/admin.js"></script>
+  </body>
+</html>
