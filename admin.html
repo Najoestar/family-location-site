@@ -9,18 +9,19 @@
   <body>
     <main class="shell admin-shell">
       <section class="hero-panel admin-heading">
+        <button id="languageToggle" class="language-toggle" type="button" aria-label="Change language">English</button>
         <div>
-          <p class="eyebrow">لوحة التحكم</p>
-          <h1>مواقع المنازل المستلمة</h1>
-          <p class="subtext">تظهر هنا نقاط الخريطة فقط بدون أسماء أو أرقام جوال أو بريد إلكتروني أو حسابات.</p>
+          <p class="eyebrow" data-i18n="eyebrow">لوحة التحكم</p>
+          <h1 data-i18n="heroTitle">مواقع المنازل المستلمة</h1>
+          <p class="subtext" data-i18n="heroText">تظهر هنا نقاط الخريطة فقط بدون أسماء أو أرقام جوال أو بريد إلكتروني أو حسابات.</p>
         </div>
-        <button id="showQr" class="qr-link" type="button">رمز QR</button>
+        <button id="showQr" class="qr-link" type="button" data-i18n="qrButton">رمز QR</button>
       </section>
 
       <section class="form-panel">
         <div class="admin-toolbar">
-          <h2>الطلبات</h2>
-          <button id="refresh" class="secondary-button" type="button">تحديث</button>
+          <h2 data-i18n="requestsTitle">الطلبات</h2>
+          <button id="refresh" class="secondary-button" type="button" data-i18n="refreshButton">تحديث</button>
         </div>
         <div id="locations" class="location-list" aria-live="polite"></div>
       </section>
@@ -28,8 +29,8 @@
       <dialog id="qrDialog" class="qr-dialog">
         <div class="qr-box">
           <div class="admin-toolbar">
-            <h2>امسح الرمز للإرسال</h2>
-            <button id="closeQr" class="secondary-button" type="button">إغلاق</button>
+            <h2 data-i18n="scanTitle">امسح الرمز للإرسال</h2>
+            <button id="closeQr" class="secondary-button" type="button" data-i18n="closeButton">إغلاق</button>
           </div>
           <div id="qrCode" aria-label="رمز QR"></div>
           <p id="qrUrl" class="quiet"></p>
