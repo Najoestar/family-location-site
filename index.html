@@ -10,50 +10,42 @@
   <body>
     <main class="shell">
       <section class="hero-panel">
+        <button id="languageToggle" class="language-toggle" type="button" aria-label="Change language">English</button>
         <div>
-          <p class="eyebrow">تحديد موقع العائلة</p>
-          <h1>أرسل موقع المنزل بخصوصية</h1>
-          <p class="subtext">النموذج يرسل نقطة على الخريطة فقط، ولا يطلب الاسم أو رقم الجوال أو البريد الإلكتروني أو أي حساب.</p>
+          <p class="eyebrow" data-i18n="eyebrow">تحديد موقع العائلة</p>
+          <h1 data-i18n="heroTitle">أرسل موقع المنزل بخصوصية</h1>
+          <p class="subtext" data-i18n="heroText">النموذج يرسل نقطة على الخريطة فقط، ولا يطلب الاسم أو رقم الجوال أو البريد الإلكتروني أو أي حساب.</p>
         </div>
         <div class="privacy-strip" aria-label="تفاصيل الخصوصية">
-          <span>بدون أسماء</span>
-          <span>بدون أرقام جوال</span>
-          <span>بدون حسابات</span>
+          <span data-i18n="privacyNoNames">بدون أسماء</span>
+          <span data-i18n="privacyNoPhones">بدون أرقام جوال</span>
+          <span data-i18n="privacyNoPersonal">بدون معلومات شخصية</span>
         </div>
       </section>
 
       <section class="form-panel" aria-labelledby="location-title">
-        <h2 id="location-title">موقع المنزل</h2>
-        <p class="quiet">حدد المنزل على الخريطة، أو استخدم موقع الجوال، أو الصق رابط Google Maps.</p>
+        <h2 id="location-title" data-i18n="locationTitle">موقع المنزل</h2>
+        <p class="quiet" data-i18n="locationIntro">حدد المنزل على الخريطة، أو الصق رابط Google Maps.</p>
 
         <label class="span-all">
-          رابط Google Maps
-          <input id="mapsLink" name="mapsLink" inputmode="url" autocomplete="off" placeholder="الصق رابط مشاركة من Google Maps">
+          <span data-i18n="mapsLabel">رابط Google Maps</span>
+          <input id="mapsLink" name="mapsLink" inputmode="url" autocomplete="off" placeholder="الصق رابط مشاركة من Google Maps" data-i18n-placeholder="mapsPlaceholder">
         </label>
 
         <div class="map-picker span-all">
           <div id="map" aria-label="خريطة تحديد الموقع"></div>
-          <p class="map-help">اضغط على الخريطة لوضع دبوس المنزل.</p>
-        </div>
-
-        <div class="actions">
-          <button id="useLocation" class="primary-button" type="button">استخدم موقعي الحالي</button>
+          <p class="map-help" data-i18n="mapHelp">اضغط على الخريطة لوضع دبوس المنزل، أو الصق رابط Google Maps يحتوي على الإحداثيات.</p>
+          <a id="selectedMapLink" class="map-share-link is-hidden" href="#" target="_blank" rel="noreferrer" data-i18n="selectedMapLink">فتح الموقع المحدد في Google Maps</a>
         </div>
 
         <form id="locationForm">
-          <label>
-            خط العرض
-            <input id="lat" name="lat" inputmode="decimal" autocomplete="off" placeholder="24.713552" required readonly>
-          </label>
-          <label>
-            خط الطول
-            <input id="lng" name="lng" inputmode="decimal" autocomplete="off" placeholder="46.675296" required readonly>
-          </label>
+          <input id="lat" name="lat" type="hidden">
+          <input id="lng" name="lng" type="hidden">
           <label class="span-all">
-            ملاحظة اختيارية
-            <input id="note" name="note" maxlength="120" autocomplete="off" placeholder="مثلا: مدخل الشقة أو رقم البوابة">
+            <span data-i18n="noteLabel">ملاحظة اختيارية</span>
+            <input id="note" name="note" maxlength="120" autocomplete="off" placeholder="مثلا: مدخل الشقة أو رقم البوابة" data-i18n-placeholder="notePlaceholder">
           </label>
-          <button class="submit-button" type="submit">إرسال الموقع</button>
+          <button class="submit-button" type="submit" data-i18n="submitButton">إرسال الموقع</button>
         </form>
 
         <p id="status" class="status" role="status" aria-live="polite"></p>
