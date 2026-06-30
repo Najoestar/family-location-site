@@ -72,7 +72,7 @@ function normalizeCoordinate(lat, lng) {
   };
 }
 
-function extractGoogleMapsCoordinates(value) {
+function extractGoogleMapsCoordinates(value, allowLoosePair = true) {
   let text = String(value || "").trim();
   if (!text) return null;
 
@@ -92,8 +92,11 @@ function extractGoogleMapsCoordinates(value) {
     { regex: /!2d(-?\d+(?:\.\d+)?)!3d(-?\d+(?:\.\d+)?)/, reverse: true },
     { regex: /[?&](?:query|q|ll|center|destination|daddr)=loc:(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/ },
     { regex: /[?&](?:query|q|ll|center|destination|daddr)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/ },
-    { regex: /(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/ },
   ];
+
+  if (allowLoosePair) {
+    patterns.push({ regex: /(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/ });
+  }
 
   for (const pattern of patterns) {
     const match = text.match(pattern.regex);
@@ -172,7 +175,7 @@ async function resolveGoogleMapsCoordinates(value) {
       }
 
       const text = (await response.text()).slice(0, 300000);
-      const fromBody = extractGoogleMapsCoordinates(text);
+      const fromBody = extractGoogleMapsCoordinates(text, false);
       if (fromBody) return { ...fromBody, resolvedUrl: response.url || currentUrl.href };
       break;
     } finally {
