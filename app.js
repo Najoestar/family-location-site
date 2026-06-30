@@ -30,7 +30,8 @@ const translations = {
     submitButton: "إرسال الموقع",
     locationSet: "تم تحديد الموقع. يمكنك إرساله الآن.",
     mapLoadError: "تعذر تحميل الخريطة. الصق رابط Google Maps بدلا من ذلك.",
-    pasteCoordinatesError: "الصق رابط Google Maps يحتوي على الإحداثيات. إذا كان الرابط قصيرا، افتحه أولا ثم انسخ الرابط الكامل.",
+    pasteCoordinatesError: "لم نتمكن من قراءة هذا الرابط. افتحه في Google Maps ثم انسخ الرابط الكامل، أو حدد الموقع على الخريطة.",
+    resolvingMapLink: "جاري قراءة رابط Google Maps...",
     googleLocationAdded: "تم إضافة موقع Google Maps. تأكد من الدبوس ثم أرسل.",
     invalidLocation: "يرجى تحديد موقع صحيح على الخريطة.",
     sending: "جاري إرسال الموقع...",
@@ -59,7 +60,8 @@ const translations = {
     submitButton: "Send location",
     locationSet: "Location selected. You can send it now.",
     mapLoadError: "Could not load the map. Paste a Google Maps link instead.",
-    pasteCoordinatesError: "Paste a Google Maps link that includes coordinates. If it is a short link, open it first, then copy the full link.",
+    pasteCoordinatesError: "Could not read this link. Open it in Google Maps and copy the full link, or select the location on the map.",
+    resolvingMapLink: "Checking Google Maps link...",
     googleLocationAdded: "Google Maps location added. Check the pin, then send.",
     invalidLocation: "Please select a valid location on the map.",
     sending: "Sending location...",
@@ -73,6 +75,8 @@ let marker;
 let currentLanguage = localStorage.getItem("siteLanguage") === "en" ? "en" : "ar";
 let currentStatusKey = "";
 let currentStatusIsError = false;
+let resolveMapLinkTimer;
+let resolveMapLinkRequestId = 0;
 
 function t(key) {
   return translations[currentLanguage][key] || translations.ar[key] || key;
@@ -148,16 +152,21 @@ function parseGoogleMapsCoordinates(value) {
   let text = value.trim();
   if (!text) return null;
 
-  try {
-    text = decodeURIComponent(text);
-  } catch (error) {
-    text = value.trim();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const decoded = decodeURIComponent(text);
+      if (decoded === text) break;
+      text = decoded;
+    } catch (error) {
+      break;
+    }
   }
 
   const patterns = [
     { regex: /@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/ },
     { regex: /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/ },
     { regex: /!2d(-?\d+(?:\.\d+)?)!3d(-?\d+(?:\.\d+)?)/, reverse: true },
+    { regex: /[?&](?:query|q|ll|center|destination|daddr)=loc:(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/ },
     { regex: /[?&]query=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/ },
     { regex: /[?&]q=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/ },
     { regex: /[?&]ll=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/ },
@@ -181,6 +190,43 @@ function parseGoogleMapsCoordinates(value) {
   }
 
   return null;
+}
+
+
+function clearMapLinkResolve() {
+  window.clearTimeout(resolveMapLinkTimer);
+  resolveMapLinkTimer = undefined;
+  resolveMapLinkRequestId += 1;
+}
+
+async function resolveGoogleMapsLink(value, requestId) {
+  setStatusKey("resolvingMapLink");
+
+  try {
+    const response = await fetch("/api/resolve-map-link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: value }),
+    });
+
+    const result = await response.json();
+    if (requestId !== resolveMapLinkRequestId || mapsLinkInput.value.trim() !== value.trim()) return;
+    if (!response.ok) throw new Error(result.error || t("pasteCoordinatesError"));
+
+    setLocation(result.lat, result.lng, "googleLocationAdded");
+  } catch (error) {
+    if (requestId === resolveMapLinkRequestId && mapsLinkInput.value.trim() === value.trim()) {
+      setStatusKey("pasteCoordinatesError", true);
+    }
+  }
+}
+
+function scheduleMapLinkResolve(value) {
+  window.clearTimeout(resolveMapLinkTimer);
+  const requestId = resolveMapLinkRequestId + 1;
+  resolveMapLinkRequestId = requestId;
+  setStatusKey("resolvingMapLink");
+  resolveMapLinkTimer = window.setTimeout(() => resolveGoogleMapsLink(value, requestId), 650);
 }
 
 function initMap() {
@@ -211,13 +257,20 @@ function initMap() {
 }
 
 mapsLinkInput.addEventListener("input", () => {
-  const coordinates = parseGoogleMapsCoordinates(mapsLinkInput.value);
-  if (!coordinates) {
-    if (mapsLinkInput.value.trim()) setStatusKey("pasteCoordinatesError", true);
+  const value = mapsLinkInput.value.trim();
+  const coordinates = parseGoogleMapsCoordinates(value);
+
+  if (coordinates) {
+    clearMapLinkResolve();
+    setLocation(coordinates.lat, coordinates.lng, "googleLocationAdded");
     return;
   }
 
-  setLocation(coordinates.lat, coordinates.lng, "googleLocationAdded");
+  if (value) {
+    scheduleMapLinkResolve(value);
+  } else {
+    clearMapLinkResolve();
+  }
 });
 
 languageToggle.addEventListener("click", () => {
