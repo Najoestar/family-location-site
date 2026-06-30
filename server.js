@@ -53,6 +53,136 @@ function readBody(req) {
   });
 }
 
+
+function isValidCoordinate(value, min, max) {
+  return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
+}
+
+function normalizeCoordinate(lat, lng) {
+  const latitude = Number(lat);
+  const longitude = Number(lng);
+
+  if (!isValidCoordinate(latitude, -90, 90) || !isValidCoordinate(longitude, -180, 180)) {
+    return null;
+  }
+
+  return {
+    lat: Number(latitude.toFixed(6)),
+    lng: Number(longitude.toFixed(6)),
+  };
+}
+
+function extractGoogleMapsCoordinates(value) {
+  let text = String(value || "").trim();
+  if (!text) return null;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const decoded = decodeURIComponent(text);
+      if (decoded === text) break;
+      text = decoded;
+    } catch (error) {
+      break;
+    }
+  }
+
+  const patterns = [
+    { regex: /@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/ },
+    { regex: /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/ },
+    { regex: /!2d(-?\d+(?:\.\d+)?)!3d(-?\d+(?:\.\d+)?)/, reverse: true },
+    { regex: /[?&](?:query|q|ll|center|destination|daddr)=loc:(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/ },
+    { regex: /[?&](?:query|q|ll|center|destination|daddr)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/ },
+    { regex: /(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/ },
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern.regex);
+    if (!match) continue;
+
+    let lat = match[1];
+    let lng = match[2];
+    if (pattern.reverse) [lat, lng] = [lng, lat];
+
+    const coordinate = normalizeCoordinate(lat, lng);
+    if (coordinate) return coordinate;
+  }
+
+  return null;
+}
+
+function isAllowedGoogleMapsHost(hostname) {
+  const host = hostname.toLowerCase();
+  return (
+    host === "maps.app.goo.gl" ||
+    host === "goo.gl" ||
+    host === "g.co" ||
+    host === "google.com" ||
+    host.endsWith(".google.com") ||
+    /^(?:www\.|maps\.)?google\.[a-z]{2,3}(?:\.[a-z]{2})?$/.test(host)
+  );
+}
+
+function toAllowedGoogleMapsUrl(value) {
+  let parsed;
+  try {
+    parsed = new URL(String(value || "").trim());
+  } catch (error) {
+    return null;
+  }
+
+  if (!["http:", "https:"].includes(parsed.protocol)) return null;
+  if (!isAllowedGoogleMapsHost(parsed.hostname)) return null;
+  return parsed;
+}
+
+async function resolveGoogleMapsCoordinates(value) {
+  const direct = extractGoogleMapsCoordinates(value);
+  if (direct) return { ...direct, resolvedUrl: String(value).trim() };
+
+  let currentUrl = toAllowedGoogleMapsUrl(value);
+  if (!currentUrl) throw new Error("Unsupported Google Maps link.");
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 9000);
+
+    try {
+      const response = await fetch(currentUrl.href, {
+        redirect: "manual",
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; FamilyLocationSite/1.0)",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+      });
+
+      const fromResponseUrl = extractGoogleMapsCoordinates(response.url);
+      if (fromResponseUrl) return { ...fromResponseUrl, resolvedUrl: response.url };
+
+      const location = response.headers.get("location");
+      if (location) {
+        const nextUrl = toAllowedGoogleMapsUrl(new URL(location, currentUrl).href);
+        if (!nextUrl) throw new Error("Unsupported Google Maps redirect.");
+
+        const fromRedirect = extractGoogleMapsCoordinates(nextUrl.href);
+        if (fromRedirect) return { ...fromRedirect, resolvedUrl: nextUrl.href };
+
+        currentUrl = nextUrl;
+        continue;
+      }
+
+      const text = (await response.text()).slice(0, 300000);
+      const fromBody = extractGoogleMapsCoordinates(text);
+      if (fromBody) return { ...fromBody, resolvedUrl: response.url || currentUrl.href };
+      break;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  throw new Error("Could not read coordinates from this Google Maps link.");
+}
+
 function cleanNote(note) {
   if (typeof note !== "string") return "";
   return note.replace(/[<>]/g, "").trim().slice(0, 120);
@@ -72,7 +202,7 @@ async function handleApi(req, res, pathname) {
       const lat = Number(payload.lat);
       const lng = Number(payload.lng);
 
-      if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) {
+      if (!isValidCoordinate(lat, -90, 90) || !isValidCoordinate(lng, -180, 180)) {
         return sendJson(res, 400, { error: "Please provide a valid location." });
       }
 
@@ -90,6 +220,23 @@ async function handleApi(req, res, pathname) {
       return sendJson(res, 201, { ok: true });
     } catch (error) {
       return sendJson(res, 400, { error: "The location could not be saved." });
+    }
+  }
+
+
+  if (req.method === "POST" && pathname === "/api/resolve-map-link") {
+    try {
+      const payload = JSON.parse(await readBody(req));
+      const mapUrl = typeof payload.url === "string" ? payload.url.trim() : "";
+
+      if (!mapUrl || mapUrl.length > 3000) {
+        return sendJson(res, 400, { error: "Please paste a valid Google Maps link." });
+      }
+
+      const coordinates = await resolveGoogleMapsCoordinates(mapUrl);
+      return sendJson(res, 200, coordinates);
+    } catch (error) {
+      return sendJson(res, 422, { error: "Could not read this Google Maps link." });
     }
   }
 
