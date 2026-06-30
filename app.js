@@ -135,6 +135,12 @@ function updateSelectedMapLink(lat, lng) {
   selectedMapLink.classList.remove("is-hidden");
 }
 
+function clearSelectedLocation() {
+  latInput.value = "";
+  lngInput.value = "";
+  if (selectedMapLink) selectedMapLink.classList.add("is-hidden");
+}
+
 function setLocation(lat, lng, statusKey = "locationSet") {
   latInput.value = Number(lat).toFixed(6);
   lngInput.value = Number(lng).toFixed(6);
@@ -213,10 +219,7 @@ async function resolveGoogleMapsLink(value, requestId) {
     if (requestId !== resolveMapLinkRequestId || mapsLinkInput.value.trim() !== value.trim()) return;
     if (!response.ok) throw new Error(result.error || t("pasteCoordinatesError"));
 
-    const resolvedCoordinates = parseGoogleMapsCoordinates(result.resolvedUrl || "");
-    if (!resolvedCoordinates) throw new Error(t("pasteCoordinatesError"));
-
-    setLocation(resolvedCoordinates.lat, resolvedCoordinates.lng, "googleLocationAdded");
+    setLocation(result.lat, result.lng, "googleLocationAdded");
   } catch (error) {
     if (requestId === resolveMapLinkRequestId && mapsLinkInput.value.trim() === value.trim()) {
       setStatusKey("pasteCoordinatesError", true);
@@ -270,9 +273,11 @@ mapsLinkInput.addEventListener("input", () => {
   }
 
   if (value) {
+    clearSelectedLocation();
     scheduleMapLinkResolve(value);
   } else {
     clearMapLinkResolve();
+    clearSelectedLocation();
   }
 });
 
