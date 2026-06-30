@@ -58,6 +58,58 @@ function isValidCoordinate(value, min, max) {
   return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
 }
 
+function decodeGoogleMapsText(value) {
+  let text = String(value || "").trim();
+  if (!text) return "";
+
+  const percentMap = {
+    "%21": "!",
+    "%22": "\"",
+    "%23": "#",
+    "%24": "$",
+    "%25": "%",
+    "%26": "&",
+    "%27": "'",
+    "%28": "(",
+    "%29": ")",
+    "%2A": "*",
+    "%2B": "+",
+    "%2C": ",",
+    "%2F": "/",
+    "%3A": ":",
+    "%3B": ";",
+    "%3D": "=",
+    "%3F": "?",
+    "%40": "@",
+    "%5B": "[",
+    "%5D": "]",
+  };
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    let decoded = text
+      .replace(/&amp;/g, "&")
+      .replace(/&#39;/g, "'")
+      .replace(/&quot;/g, "\"")
+      .replace(/\\u([0-9a-fA-F]{4})/g, (_match, code) => String.fromCharCode(parseInt(code, 16)))
+      .replace(/%(21|22|23|24|25|26|27|28|29|2a|2b|2c|2f|3a|3b|3d|3f|40|5b|5d)/gi, (match) => percentMap[match.toUpperCase()] || match);
+
+    try {
+      decoded = decodeURIComponent(decoded);
+    } catch (error) {
+      try {
+        decoded = decodeURI(decoded);
+      } catch (innerError) {
+        // The full Google HTML can contain stray percent signs. The targeted replacements above are enough for map data.
+      }
+    }
+
+    if (decoded === text) break;
+    text = decoded;
+  }
+
+  return text;
+}
+
 function normalizeCoordinate(lat, lng) {
   const latitude = Number(lat);
   const longitude = Number(lng);
@@ -72,30 +124,30 @@ function normalizeCoordinate(lat, lng) {
   };
 }
 
-function extractGoogleMapsCoordinates(value, allowLoosePair = true) {
-  let text = String(value || "").trim();
+function extractGoogleMapsCoordinates(value, options = {}) {
+  const { allowLoosePair = true, allowBodyData = true } = options;
+  const text = decodeGoogleMapsText(value);
   if (!text) return null;
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      const decoded = decodeURIComponent(text);
-      if (decoded === text) break;
-      text = decoded;
-    } catch (error) {
-      break;
-    }
-  }
-
+  const number = "(-?\\d{1,3}(?:\\.\\d+)?)";
+  const preciseNumber = "(-?\\d{1,3}\\.\\d{3,})";
   const patterns = [
-    { regex: /@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/ },
-    { regex: /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/ },
-    { regex: /!2d(-?\d+(?:\.\d+)?)!3d(-?\d+(?:\.\d+)?)/, reverse: true },
-    { regex: /[?&](?:query|q|ll|center|destination|daddr)=loc:(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/ },
-    { regex: /[?&](?:query|q|ll|center|destination|daddr)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/ },
+    { regex: new RegExp("@" + preciseNumber + "\\s*,\\s*" + preciseNumber) },
+    { regex: new RegExp("!3d" + preciseNumber + "!4d" + preciseNumber) },
+    { regex: new RegExp("!2d" + preciseNumber + "!3d" + preciseNumber), reverse: true },
+    { regex: new RegExp("[?&](?:query|q|ll|center|destination|daddr|saddr)=loc:" + number + "\\s*,\\s*" + number) },
+    { regex: new RegExp("[?&](?:query|q|ll|center|destination|daddr|saddr)=" + number + "\\s*,\\s*" + number) },
   ];
 
+  if (allowBodyData) {
+    patterns.push(
+      { regex: new RegExp("!1d\\d+(?:\\.\\d+)?!2d" + preciseNumber + "!3d" + preciseNumber), reverse: true },
+      { regex: new RegExp("\\[\\s*\\d{3,}(?:\\.\\d+)?\\s*,\\s*" + preciseNumber + "\\s*,\\s*" + preciseNumber + "\\s*\\]"), reverse: true }
+    );
+  }
+
   if (allowLoosePair) {
-    patterns.push({ regex: /(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/ });
+    patterns.push({ regex: new RegExp(number + "\\s*,\\s*" + number) });
   }
 
   for (const pattern of patterns) {
@@ -139,7 +191,7 @@ function toAllowedGoogleMapsUrl(value) {
 }
 
 async function resolveGoogleMapsCoordinates(value) {
-  const direct = extractGoogleMapsCoordinates(value);
+  const direct = extractGoogleMapsCoordinates(value, { allowLoosePair: true, allowBodyData: false });
   if (direct) return { ...direct, resolvedUrl: String(value).trim() };
 
   let currentUrl = toAllowedGoogleMapsUrl(value);
@@ -159,7 +211,7 @@ async function resolveGoogleMapsCoordinates(value) {
         },
       });
 
-      const fromResponseUrl = extractGoogleMapsCoordinates(response.url);
+      const fromResponseUrl = extractGoogleMapsCoordinates(response.url, { allowLoosePair: true, allowBodyData: false });
       if (fromResponseUrl) return { ...fromResponseUrl, resolvedUrl: response.url };
 
       const location = response.headers.get("location");
@@ -167,15 +219,15 @@ async function resolveGoogleMapsCoordinates(value) {
         const nextUrl = toAllowedGoogleMapsUrl(new URL(location, currentUrl).href);
         if (!nextUrl) throw new Error("Unsupported Google Maps redirect.");
 
-        const fromRedirect = extractGoogleMapsCoordinates(nextUrl.href);
+        const fromRedirect = extractGoogleMapsCoordinates(nextUrl.href, { allowLoosePair: true, allowBodyData: false });
         if (fromRedirect) return { ...fromRedirect, resolvedUrl: nextUrl.href };
 
         currentUrl = nextUrl;
         continue;
       }
 
-      const text = (await response.text()).slice(0, 300000);
-      const fromBody = extractGoogleMapsCoordinates(text, false);
+      const text = (await response.text()).slice(0, 1000000);
+      const fromBody = extractGoogleMapsCoordinates(text, { allowLoosePair: false, allowBodyData: true });
       if (fromBody) return { ...fromBody, resolvedUrl: response.url || currentUrl.href };
       break;
     } finally {
