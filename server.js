@@ -347,7 +347,10 @@ function serveFile(res, pathname) {
       return res.end("Not found");
     }
 
-    res.writeHead(200, { "Content-Type": mimeTypes[path.extname(resolved)] || "text/plain; charset=utf-8" });
+    res.writeHead(200, {
+      "Content-Type": mimeTypes[path.extname(resolved)] || "text/plain; charset=utf-8",
+      "Cache-Control": "no-store, max-age=0",
+    });
     res.end(content);
   });
 }
