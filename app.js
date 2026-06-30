@@ -219,7 +219,10 @@ async function resolveGoogleMapsLink(value, requestId) {
     if (requestId !== resolveMapLinkRequestId || mapsLinkInput.value.trim() !== value.trim()) return;
     if (!response.ok) throw new Error(result.error || t("pasteCoordinatesError"));
 
-    setLocation(result.lat, result.lng, "googleLocationAdded");
+    const resolvedCoordinates = parseGoogleMapsCoordinates(result.resolvedUrl || "");
+    if (!resolvedCoordinates) throw new Error(t("pasteCoordinatesError"));
+
+    setLocation(resolvedCoordinates.lat, resolvedCoordinates.lng, "googleLocationAdded");
   } catch (error) {
     if (requestId === resolveMapLinkRequestId && mapsLinkInput.value.trim() === value.trim()) {
       setStatusKey("pasteCoordinatesError", true);
