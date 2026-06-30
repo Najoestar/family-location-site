@@ -129,8 +129,8 @@ function extractGoogleMapsCoordinates(value, options = {}) {
   const text = decodeGoogleMapsText(value);
   if (!text) return null;
 
-  const number = "(-?\\d{1,3}(?:\\.\\d+)?)";
-  const preciseNumber = "(-?\\d{1,3}\\.\\d{3,})";
+  const number = "([+-]?\\d{1,3}(?:\\.\\d+)?)";
+  const preciseNumber = "([+-]?\\d{1,3}\\.\\d{3,})";
   const patterns = [
     { regex: new RegExp("@" + preciseNumber + "\\s*,\\s*" + preciseNumber) },
     { regex: new RegExp("!3d" + preciseNumber + "!4d" + preciseNumber) },
@@ -190,6 +190,25 @@ function toAllowedGoogleMapsUrl(value) {
   return parsed;
 }
 
+function extractGoogleMapsRedirect(value, baseUrl) {
+  const text = decodeGoogleMapsText(value);
+  const patterns = [
+    /<meta[^>]+http-equiv=["']?refresh["']?[^>]+content=["'][^"']*url=([^"']+)["']/i,
+    /<meta[^>]+content=["'][^"']*url=([^"']+)["'][^>]+http-equiv=["']?refresh["']?/i,
+    /(?:window\.)?location\.(?:href|replace|assign)\s*(?:=|\()\s*["']([^"']+)["']/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+
+    const redirectUrl = toAllowedGoogleMapsUrl(new URL(match[1], baseUrl).href);
+    if (redirectUrl) return redirectUrl;
+  }
+
+  return null;
+}
+
 async function resolveGoogleMapsCoordinates(value) {
   const direct = extractGoogleMapsCoordinates(value, { allowLoosePair: true, allowBodyData: false });
   if (direct) return { ...direct, resolvedUrl: String(value).trim() };
@@ -227,8 +246,15 @@ async function resolveGoogleMapsCoordinates(value) {
       }
 
       const text = (await response.text()).slice(0, 1000000);
-      const fromBody = extractGoogleMapsCoordinates(text, { allowLoosePair: false, allowBodyData: true });
-      if (fromBody) return { ...fromBody, resolvedUrl: response.url || currentUrl.href };
+      const redirectUrl = extractGoogleMapsRedirect(text, currentUrl);
+      if (redirectUrl) {
+        const fromRedirectBody = extractGoogleMapsCoordinates(redirectUrl.href, { allowLoosePair: true, allowBodyData: false });
+        if (fromRedirectBody) return { ...fromRedirectBody, resolvedUrl: redirectUrl.href };
+
+        currentUrl = redirectUrl;
+        continue;
+      }
+
       break;
     } finally {
       clearTimeout(timeout);
